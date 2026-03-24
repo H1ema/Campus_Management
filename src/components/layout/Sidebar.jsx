@@ -19,6 +19,15 @@ const Sidebar = () => {
       common.splice(1, 0, { path: '/hostel', icon: <Building2 size={20} />, label: 'Hostel' });
     }
     
+    // Insert after Hostel/Timetable/Directory
+    // For admin, add Students management
+    if (role === 'admin') {
+      common.push({ path: '/students', icon: <Users size={20} />, label: 'Students' });
+      common.push({ path: '/classes', icon: <LayoutDashboard size={20} />, label: 'Classes' });
+    } else if (role === 'student' || role === 'teacher') {
+      common.push({ path: '/classes', icon: <LayoutDashboard size={20} />, label: 'Classes' });
+    }
+    
     if (role === 'student') {
       common.splice(4, 0, { path: '/fees', icon: <IndianRupee size={20} />, label: 'Fees' });
     } else if (role === 'admin') {

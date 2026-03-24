@@ -8,6 +8,8 @@ import Timetable from './pages/Timetable';
 import Contacts from './pages/Contacts';
 import Fees from './pages/Fees';
 import Complaints from './pages/Complaints';
+import Students from './pages/Students';
+import Classes from './pages/Classes';
 
 function App() {
   return (
@@ -24,6 +26,8 @@ function App() {
             <Route path="hostel" element={<Hostel />} />
             <Route path="timetable" element={<Timetable />} />
             <Route path="contacts" element={<Contacts />} />
+            <Route path="students" element={<Students />} />
+            <Route path="classes" element={<Classes />} />
             <Route path="fees" element={<Fees />} />
             <Route path="complaints" element={<Complaints />} />
           </Route>

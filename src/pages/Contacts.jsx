@@ -1,20 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getAllContacts } from '../services/firestoreService';
 
 const Contacts = () => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('All');
+  const [contacts, setContacts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const contacts = [
-    { id: 1, name: 'Ram Mohan', role: 'Professor', department: 'Computer Science', email: 'alan@campus.edu', phone: '+1 234 567 8900' },
-    { id: 2, name: 'Vidhya', role: 'Head of Dept', department: 'Mathematics', email: 'ada@campus.edu', phone: '+1 234 567 8901' },
-    { id: 3, name: 'Joseph', role: 'Administrator', department: 'Administration', email: 'grace@campus.edu', phone: '+1 234 567 8902' },
-    { id: 4, name: 'Ramya', role: 'Professor', department: 'Physics', email: 'john@campus.edu', phone: '+1 234 567 8903' },
-  ];
+  useEffect(() => {
+    const fetchContacts = async () => {
+      const data = await getAllContacts();
+      setContacts(data);
+      setLoading(false);
+    };
+    fetchContacts();
+  }, []);
 
   const filteredContacts = contacts.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.department.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) || 
+                          (c.department && c.department.toLowerCase().includes(search.toLowerCase()));
+    
     if (filter === 'All') return matchesSearch;
-    if (filter === 'Faculty') return matchesSearch && c.role.includes('Professor') || c.role.includes('Head');
+    if (filter === 'Faculty') return matchesSearch && (c.role.includes('Professor') || c.role.includes('Head'));
     if (filter === 'Admin') return matchesSearch && c.role === 'Administrator';
     return matchesSearch;
   });
@@ -52,23 +59,33 @@ const Contacts = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-        {filteredContacts.map(contact => (
-          <div key={contact.id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-            <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', color: '#fff', flexShrink: 0 }}>
-              {contact.name.charAt(0)}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h3 style={{ margin: 0, fontSize: '1.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contact.name}</h3>
-              <p style={{ color: 'var(--accent-primary)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>{contact.role} • {contact.department}</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                <span>✉️ {contact.email}</span>
-                <span>📞 {contact.phone}</span>
+      {loading ? (
+        <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
+          <p style={{ color: 'var(--text-secondary)' }}>Loading directory...</p>
+        </div>
+      ) : filteredContacts.length === 0 ? (
+        <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
+          <p style={{ color: 'var(--text-secondary)' }}>No contacts found matching your criteria.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
+          {filteredContacts.map(contact => (
+            <div key={contact.id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+              <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', color: '#fff', flexShrink: 0 }}>
+                {contact.name.charAt(0)}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{contact.name}</h3>
+                <p style={{ color: 'var(--accent-primary)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>{contact.role} • {contact.department}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  <span>✉️ {contact.email}</span>
+                  <span>📞 {contact.phone}</span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

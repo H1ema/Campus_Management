@@ -1,14 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import {
+  getAllComplaints,
+  getUserComplaints,
+  addComplaint,
+  updateComplaintStatus
+} from '../services/firestoreService';
 
 const Complaints = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const [complaints, setComplaints] = useState([
-    { id: 'C-001', subject: 'Wi-Fi Issue in Hostel A', status: 'Review', date: '2026-03-21' },
-    { id: 'C-002', subject: 'Library working hours', status: 'Resolved', date: '2026-03-19' },
-    { id: 'C-003', subject: 'Water supply disruption', status: 'Submitted', date: '2026-03-23' },
-  ]);
+  const [complaints, setComplaints] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [category, setCategory] = useState('Hostel / Accommodation');
+  const [description, setDescription] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const load = async () => {
+    try {
+      const data = isAdmin
+        ? await getAllComplaints()
+        : await getUserComplaints(user?.id || user?.uid);
+      setComplaints(data);
+    } catch (err) {
+      console.error('Failed to load complaints', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, [isAdmin, user]);
 
   const getStatusBadge = (status) => {
     const map = {
@@ -20,6 +41,44 @@ const Complaints = () => {
     return map[status] || 'badge-secondary';
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!description.trim()) return;
+    setSubmitting(true);
+    try {
+      await addComplaint({
+        userId: user?.id || user?.uid,
+        userName: user?.name || 'Student',
+        category,
+        subject: description.slice(0, 60),
+        description,
+      });
+      setDescription('');
+      await load();
+    } catch (err) {
+      console.error('Failed to submit complaint', err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleStatusUpdate = async (complaintId, newStatus) => {
+    try {
+      await updateComplaintStatus(complaintId, newStatus);
+      setComplaints((prev) =>
+        prev.map((c) => (c.id === complaintId ? { ...c, status: newStatus } : c))
+      );
+    } catch (err) {
+      console.error('Failed to update status', err);
+    }
+  };
+
+  const formatDate = (ts) => {
+    if (!ts) return '—';
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    return d.toISOString().slice(0, 10);
+  };
+
   return (
     <div className="page-container fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
@@ -27,18 +86,22 @@ const Complaints = () => {
           <h1 className="text-gradient" style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>Complaints & Feedback</h1>
           <p style={{ color: 'var(--text-secondary)' }}>Report non-academic issues or view institutional grievances</p>
         </div>
-        {!isAdmin && <button className="btn btn-primary">+ New Complaint</button>}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr' : '1fr 1fr', gap: '2rem' }}>
-        
+
         {!isAdmin && (
           <div className="glass-panel" style={{ padding: '2rem' }}>
             <h2 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Submit a Complaint</h2>
-            <form style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Category</label>
-                <select className="input-field" style={{ appearance: 'none', backgroundColor: 'rgba(18,18,18,0.6)' }}>
+                <select
+                  className="input-field"
+                  style={{ appearance: 'none', backgroundColor: 'rgba(18,18,18,0.6)' }}
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                >
                   <option>Hostel / Accommodation</option>
                   <option>Facilities / Maintenance</option>
                   <option>Academic Staff</option>
@@ -47,9 +110,17 @@ const Complaints = () => {
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Description</label>
-                <textarea className="input-field" rows="4" placeholder="Describe your issue in detail..."></textarea>
+                <textarea
+                  className="input-field"
+                  rows="4"
+                  placeholder="Describe your issue in detail..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
               </div>
-              <button type="button" className="btn btn-primary" style={{ alignSelf: 'flex-start' }}>Submit Ticket</button>
+              <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start' }} disabled={submitting}>
+                {submitting ? 'Submitting…' : 'Submit Ticket'}
+              </button>
             </form>
           </div>
         )}
@@ -58,23 +129,43 @@ const Complaints = () => {
           <h2 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)' }}>
             {isAdmin ? 'All Active Complaints' : 'Your Previous Tickets'}
           </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {complaints.map(c => (
-              <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '8px', transition: 'background 0.2s' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontFamily: 'monospace' }}>{c.id}</span>
-                    <h4 style={{ color: 'var(--text-primary)', margin: 0, fontSize: '1.1rem' }}>{c.subject}</h4>
+          {loading ? (
+            <p style={{ color: 'var(--text-secondary)' }}>Loading…</p>
+          ) : complaints.length === 0 ? (
+            <p style={{ color: 'var(--text-secondary)' }}>No complaints found.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {complaints.map((c) => (
+                <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-border)', borderRadius: '8px', transition: 'background 0.2s' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontFamily: 'monospace' }}>{c.id.slice(0, 8).toUpperCase()}</span>
+                      <h4 style={{ color: 'var(--text-primary)', margin: 0, fontSize: '1.1rem' }}>{c.subject || c.description?.slice(0, 60)}</h4>
+                    </div>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                      {isAdmin && c.userName ? `By ${c.userName} · ` : ''}Filed on {formatDate(c.createdAt)}
+                    </span>
                   </div>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Filed on {c.date}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <span className={`badge ${getStatusBadge(c.status)}`}>{c.status}</span>
+                    {isAdmin && (
+                      <select
+                        className="input-field"
+                        style={{ padding: '0.4rem 0.7rem', fontSize: '0.8rem', backgroundColor: 'rgba(18,18,18,0.6)' }}
+                        value={c.status}
+                        onChange={(e) => handleStatusUpdate(c.id, e.target.value)}
+                      >
+                        <option>Submitted</option>
+                        <option>Review</option>
+                        <option>Resolved</option>
+                        <option>Closed</option>
+                      </select>
+                    )}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <span className={`badge ${getStatusBadge(c.status)}`}>{c.status}</span>
-                  {isAdmin && <button className="btn btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem' }}>Update</button>}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
       </div>

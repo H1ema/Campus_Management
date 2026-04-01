@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { fetchWithAuth } from '../services/api';
+import { getDashboardStats } from '../services/firestoreService';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -10,17 +10,12 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchDashboardDetails = async () => {
       try {
-        // Attempt to fetch specific dashboard details if backend supports it
-        // Depending on role, the endpoint could vary, but for now we simulate or use a general one.
-        // Assuming there isn't a specific dashboard route unless provided, using some base data.
-        setStats({
-          students: '1,245',
-          courses: '34',
-          attendance: '92%',
-          activeComplaints: '5'
-        });
+        const data = await getDashboardStats();
+        setStats(data);
       } catch (err) {
         console.error("Failed to load dashboard stats", err);
+        // fallback to static values
+        setStats({ students: '—', courses: '34', attendance: '92%', activeComplaints: '—' });
       } finally {
         setLoading(false);
       }

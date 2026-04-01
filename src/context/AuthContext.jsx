@@ -1,69 +1,55 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { fetchWithAuth } from '../services/api';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser]       = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const initAuth = async () => {
-      const token = localStorage.getItem('access_token');
-      if (token) {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Try to read role from Firestore `users` collection
+        let role = 'student'; // default
+        let name = firebaseUser.displayName || firebaseUser.email;
         try {
-          // Fetch user details if token exists
-          // Adjust endpoint based on FastAPI implementation
-          const userData = await fetchWithAuth('/users/me');
-          setUser(userData);
-        } catch (error) {
-          console.error("Failed to restore session:", error);
-          localStorage.removeItem('access_token');
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            role = data.role || 'student';
+            name = data.name || name;
+          }
+        } catch (err) {
+          console.warn('Could not fetch user role from Firestore:', err);
         }
+
+        setUser({
+          uid:   firebaseUser.uid,
+          id:    firebaseUser.uid,
+          email: firebaseUser.email,
+          name,
+          role,
+        });
+      } else {
+        setUser(null);
       }
       setIsLoading(false);
-    };
+    });
 
-    initAuth();
+    return () => unsubscribe();
   }, []);
 
-  const login = async (role, username, password) => {
-    try {
-      // FastAPI OAuth2PasswordBearer expects form data for token endpoint
-      // Adjust if backend expects JSON: JSON.stringify({ username, password, role })
-      const formData = new URLSearchParams();
-      formData.append('username', username);
-      formData.append('password', password);
-      // Let's pass role too if backend needs it (FastAPI OAuth2 typically doesn't, but custom impl might)
-      formData.append('grant_type', 'password');
-
-      const data = await fetchWithAuth('/auth/login', {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      });
-
-      localStorage.setItem('access_token', data.access_token);
-      
-      // Fallback user object if /auth/login doesn't return user info
-      setUser(data.user || { role, name: username, id: data.id || 'sys-user' });
-      return true;
-    } catch (error) {
-      console.error("Login failed:", error);
-      throw error;
-    }
-  };
-
-  const logout = () => {
-    localStorage.removeItem('access_token');
+  const logout = async () => {
+    await signOut(auth);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, isLoading }}>
-      {children}
+    <AuthContext.Provider value={{ user, logout, isAuthenticated: !!user, isLoading }}>
+      {isLoading ? null : children}
     </AuthContext.Provider>
   );
 };

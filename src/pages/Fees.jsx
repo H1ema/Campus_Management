@@ -1,17 +1,36 @@
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { getAllFees, getStudentFee } from '../services/firestoreService';
 
 const Fees = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
-  const feeData = {
-    total: 50000,
-    paid: 35000,
-    due: 15000,
-    deadline: '2026-05-01'
-  };
+  const [feeData, setFeeData] = useState(null);
+  const [allFees, setAllFees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
 
-  const progress = (feeData.paid / feeData.total) * 100;
+  useEffect(() => {
+    if (!user?.uid) { setLoading(false); return; }
+    const load = async () => {
+      try {
+        if (isAdmin) {
+          const data = await getAllFees();
+          setAllFees(data || []);
+        } else {
+          const data = await getStudentFee(user.uid, user.name);
+          setFeeData(data || null);
+        }
+      } catch (err) {
+        console.error(err);
+        setError('Failed to load fee data.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [user]);
 
   return (
     <div className="page-container fade-in">
@@ -20,63 +39,77 @@ const Fees = () => {
         <p style={{ color: 'var(--text-secondary)' }}>Administer and track institutional fee payments</p>
       </div>
 
-      {!isAdmin ? (
+      {loading ? (
+        <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
+          <p style={{ color: 'var(--text-secondary)' }}>Loading fee data…</p>
+        </div>
+      ) : error ? (
+        <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
+          <p style={{ color: 'var(--accent-danger, #f87171)' }}>{error}</p>
+        </div>
+      ) : !isAdmin ? (
+        /* ── STUDENT VIEW ── */
         <div className="glass-panel" style={{ padding: '2rem', overflowX: 'auto' }}>
           <h2 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)' }}>My Fee Details</h2>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
-            <thead>
-              <tr>
-                <th style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', textAlign: 'left', color: 'var(--text-secondary)' }}>Student Name</th>
-                <th style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', textAlign: 'right', color: 'var(--text-secondary)' }}>Total Fee</th>
-                <th style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', textAlign: 'right', color: 'var(--text-secondary)' }}>Paid</th>
-                <th style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', textAlign: 'right', color: 'var(--text-secondary)' }}>Due</th>
-                <th style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', textAlign: 'right', color: 'var(--text-secondary)' }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <td style={{ padding: '1rem', color: 'var(--text-primary)' }}>{user?.name || 'Student'}</td>
-                <td style={{ padding: '1rem', textAlign: 'right', color: 'var(--text-primary)' }}>${feeData.total.toLocaleString()}</td>
-                <td style={{ padding: '1rem', textAlign: 'right', color: 'var(--text-primary)' }}>${feeData.paid.toLocaleString()}</td>
-                <td style={{ padding: '1rem', textAlign: 'right', color: 'var(--text-primary)' }}>${feeData.due.toLocaleString()}</td>
-                <td style={{ padding: '1rem', textAlign: 'right' }}>
-                  <span className={`badge ${feeData.due === 0 ? 'badge-success' : 'badge-danger'}`}>
-                    {feeData.due === 0 ? 'Paid' : 'Due'}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="glass-panel" style={{ padding: '2rem', overflowX: 'auto' }}>
-          <h2 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Student Payment Status</h2>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
-            <thead>
-              <tr>
-                <th style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', textAlign: 'left', color: 'var(--text-secondary)' }}>Student Name</th>
-                <th style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', textAlign: 'left', color: 'var(--text-secondary)' }}>ID/Roll No</th>
-                <th style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', textAlign: 'right', color: 'var(--text-secondary)' }}>Total Fee</th>
-                <th style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', textAlign: 'right', color: 'var(--text-secondary)' }}>Paid</th>
-                <th style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', textAlign: 'right', color: 'var(--text-secondary)' }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[{n: 'Alice Smith', r: 'CS201', t: 50000, p: 50000}, {n: 'Bob Jones', r: 'ME204', t: 50000, p: 20000}, {n: 'Charlie Day', r: 'CE112', t: 50000, p: 0}].map((s, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <td style={{ padding: '1rem', color: 'var(--text-primary)' }}>{s.n}</td>
-                  <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{s.r}</td>
-                  <td style={{ padding: '1rem', textAlign: 'right', color: 'var(--text-primary)' }}>${s.t.toLocaleString()}</td>
-                  <td style={{ padding: '1rem', textAlign: 'right', color: 'var(--text-primary)' }}>${s.p.toLocaleString()}</td>
+          {!feeData ? (
+            <p style={{ color: 'var(--text-secondary)' }}>No fee record found for your account.</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+              <thead>
+                <tr>
+                  {['Student Name', 'Total Fee', 'Paid', 'Due', 'Status'].map((h, i) => (
+                    <th key={h} style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', textAlign: i === 0 ? 'left' : 'right', color: 'var(--text-secondary)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <td style={{ padding: '1rem', color: 'var(--text-primary)' }}>{feeData.studentName || user?.name || 'Student'}</td>
+                  <td style={{ padding: '1rem', textAlign: 'right', color: 'var(--text-primary)' }}>₹{(feeData.total || 0).toLocaleString()}</td>
+                  <td style={{ padding: '1rem', textAlign: 'right', color: 'var(--text-primary)' }}>₹{(feeData.paid || 0).toLocaleString()}</td>
+                  <td style={{ padding: '1rem', textAlign: 'right', color: 'var(--text-primary)' }}>₹{((feeData.total || 0) - (feeData.paid || 0)).toLocaleString()}</td>
                   <td style={{ padding: '1rem', textAlign: 'right' }}>
-                    <span className={`badge ${s.p === s.t ? 'badge-success' : s.p > 0 ? 'badge-warning' : 'badge-danger'}`}>
-                      {s.p === s.t ? 'Cleared' : s.p > 0 ? 'Partial' : 'Pending'}
+                    <span className={`badge ${feeData.paid >= feeData.total ? 'badge-success' : 'badge-danger'}`}>
+                      {feeData.paid >= feeData.total ? 'Paid' : 'Due'}
                     </span>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          )}
+        </div>
+      ) : (
+        /* ── ADMIN VIEW ── */
+        <div className="glass-panel" style={{ padding: '2rem', overflowX: 'auto' }}>
+          <h2 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)' }}>Student Payment Status</h2>
+          {allFees.length === 0 ? (
+            <p style={{ color: 'var(--text-secondary)' }}>No fee records found in the database.</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
+              <thead>
+                <tr>
+                  {['Student Name', 'ID / Roll No', 'Total Fee', 'Paid', 'Status'].map((h, i) => (
+                    <th key={h} style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', textAlign: i < 2 ? 'left' : 'right', color: 'var(--text-secondary)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {allFees.map((s) => (
+                  <tr key={s.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '1rem', color: 'var(--text-primary)' }}>{s.studentName}</td>
+                    <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{s.rollNo || s.id}</td>
+                    <td style={{ padding: '1rem', textAlign: 'right', color: 'var(--text-primary)' }}>₹{(s.total || 0).toLocaleString()}</td>
+                    <td style={{ padding: '1rem', textAlign: 'right', color: 'var(--text-primary)' }}>₹{(s.paid || 0).toLocaleString()}</td>
+                    <td style={{ padding: '1rem', textAlign: 'right' }}>
+                      <span className={`badge ${s.paid >= s.total ? 'badge-success' : s.paid > 0 ? 'badge-warning' : 'badge-danger'}`}>
+                        {s.paid >= s.total ? 'Cleared' : s.paid > 0 ? 'Partial' : 'Pending'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </div>
